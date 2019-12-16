@@ -19,12 +19,14 @@ from homeassistant.util import Throttle
 _LOGGER = logging.getLogger(__name__)
 
 CONF_CYCLETIME = "cycletime"
+CONF_IGNORE_NONE = "ignore_none"
 
 DEFAULT_NAME = "DINRelay"
 DEFAULT_USERNAME = "admin"
 DEFAULT_PASSWORD = "admin"
 DEFAULT_TIMEOUT = 20
 DEFAULT_CYCLETIME = 2
+DEFAULT_IGNORE_NONE = False
 
 MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=5)
 
@@ -40,6 +42,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         vol.Optional(CONF_CYCLETIME, default=DEFAULT_CYCLETIME): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=600)
         ),
+        vol.Optional(CONF_IGNORE_NONE, default=DEFAULT_IGNORE_NONE): cv.boolean,
     }
 )
 
@@ -53,6 +56,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     pswd = config.get(CONF_PASSWORD)
     tout = config.get(CONF_TIMEOUT)
     cycl = config.get(CONF_CYCLETIME)
+    ignore_none = config.get(CONF_IGNORE_NONE)
 
     power_switch = dlipower.PowerSwitch(
         hostname=host, userid=user, password=pswd, timeout=tout, cycletime=cycl
@@ -65,8 +69,14 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     outlets = []
     parent_device = DINRelayDevice(power_switch)
 
+    def accept(outlet):
+        """Outlets without a configured description will have their number as the description."""
+        return not ignore_none or outlet.description != str(outlet.outlet_number)
+
     outlets.extend(
-        DINRelay(controller_name, parent_device, outlet) for outlet in power_switch[0:]
+        DINRelay(controller_name, parent_device, outlet)
+        for outlet in power_switch[0:]
+        if accept(outlet)
     )
 
     add_entities(outlets)
