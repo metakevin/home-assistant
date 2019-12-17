@@ -67,7 +67,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         return False
 
     outlets = []
-    parent_device = DINRelayDevice(power_switch)
+    parent_device = DINRelayDevice(power_switch, host)
 
     def accept(outlet):
         """Outlets without a configured description will have their number as the description."""
@@ -110,6 +110,11 @@ class DINRelay(SwitchDevice):
         """Return the polling state."""
         return True
 
+    @property
+    def unique_id(self):
+        """Return a unique ID based on the hostname of the power controller and the outlet number."""
+        return f"{self._parent_device.hostname}_{self._outlet_number}"
+
     def turn_on(self, **kwargs):
         """Instruct the relay to turn on."""
         self._outlet.on()
@@ -131,10 +136,11 @@ class DINRelay(SwitchDevice):
 class DINRelayDevice:
     """Device representation for per device throttling."""
 
-    def __init__(self, power_switch):
+    def __init__(self, power_switch, hostname):
         """Initialize the DINRelay device."""
         self._power_switch = power_switch
         self._statuslist = None
+        self.hostname = hostname
 
     def get_outlet_status(self, outlet_number):
         """Get status of outlet from cached status list."""
